@@ -17,8 +17,7 @@ the change goes.
 | `skills/fandom-news/` | the morning digest conversation and sports small-talk | news filtering (engine owns those) |
 | `skills/fandom-onboarding/` | first contact, config questions, cron registration | the engine's defaults (config.py owns those) |
 | `skills/fandom-watch/scripts/kit/` | generic infrastructure: clock, http, jsonio — domain-free | anything that knows what a match is |
-| `image/` | s6 services (agent-index reporter), TZ cont-init | gateway config, plow-init — the base's |
-| `vendor/client.pin` | which agent-index-client commit runs inside the agent | a vendored copy that drifts |
+| `image/` | TZ cont-init | gateway config, plow-init, agent-index reporter — the base's |
 | `Dockerfile` / `compose.yml` | how this content ships | base-image behavior |
 
 Sibling repo: [`vigia-hermes-agent`](https://github.com/emanuellcoelho/vigia-hermes-agent)

@@ -2,17 +2,17 @@
 #
 # No boot, no gateway config, no model wiring here: those are the base's, and
 # arrive as a digest bump. This repo adds one thing -- the persona and skills
-# of one assistant -- plus the Agent Index reporter and the process timezone.
+# of one assistant -- plus the process timezone. The Agent Index reporter is the base's.
 #
 # The tag is an immutable base-<sha> naming one commit of
 # plow-pbc/plow-hermes-agent, resolved to a digest, so a moving tag can never
 # substitute different bytes under a running agent.
-FROM public.ecr.aws/e1h7x4a2/plow-cloud-agents:base-51f83158a70a383f03a4d03dbd8b6ea102cf0361@sha256:253d7ed3409effa7fa59113d93b4b79bb731d8264cdaf4cd60294924d0110a2e
+FROM public.ecr.aws/e1h7x4a2/plow-cloud-agents:base-ef0019372ff8bca593611b31ebd2e08f9f1458ff@sha256:a8a2f97ad78b8192d80a984dce81d3bf5a9a883d18cb7b677704913a09b56aee
 
 # Which agent this is on the Agent Index. Compose sets this too, and a Plow
 # cloud deploy does not: the provisioner only knows AGENT_ID for the variants
 # it lists, and a self-published image is not one of them. Without it the
-# reporter refuses to guess -- image/s6-overlay/s6-rc.d/agent-index/run parks
+# base's reporter refuses to guess -- its agent-index service stands down
 # on `sleep 86400` and this agent silently stops reporting usage. It is a fact
 # of this variant, not a secret, so it belongs in the image; a host that sets
 # its own still wins, because the container environment outranks image ENV.
@@ -44,26 +44,6 @@ COPY skills/ /opt/hermes/skills/
 RUN find /opt/hermes/skills -mindepth 1 -type d -exec chmod 0755 {} + \
  && find /opt/hermes/skills -mindepth 1 -type f ! -perm -u+x -exec chmod 0644 {} + \
  && find /opt/hermes/skills -mindepth 1 -type f -perm -u+x -exec chmod 0755 {} +
-
-# The Agent Index usage reporter, fetched at build from the commit
-# vendor/client.pin names and checked against the hash beside it. Root-owned
-# under /opt/plow: the copy in the agent's home belongs to uid 10000 in a
-# running container, so scheduling that one would run whatever a turn last
-# wrote there.
-COPY vendor/client.pin /opt/plow/agent-index-client.pin
-RUN set -eu; \
-    sha="$(sed -n 's/^sha=//p' /opt/plow/agent-index-client.pin)"; \
-    want="$(sed -n 's/^sha256=//p' /opt/plow/agent-index-client.pin)"; \
-    path="$(sed -n 's/^path=//p' /opt/plow/agent-index-client.pin)"; \
-    curl -fsS --max-time 60 -o /opt/plow/agent-index-client.py \
-      "https://raw.githubusercontent.com/plow-pbc/agent-index-client/${sha}/${path}"; \
-    got="$(sha256sum /opt/plow/agent-index-client.py | cut -d' ' -f1)"; \
-    [ "$got" = "$want" ] || { echo "agent-index client is $got, pin says $want" >&2; exit 1; }; \
-    chmod 0644 /opt/plow/agent-index-client.py
-
-# The reporter's supervised service beside the gateway, and this agent's
-# oneshots. COPYed over the base's tree -- it adds services, it removes none.
-COPY image/s6-overlay/ /etc/s6-overlay/
 
 # The process timezone, resolved from this agent's config before any service
 # starts. The base sets none; every cron schedule this agent registers fires

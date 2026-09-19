@@ -5,12 +5,6 @@ This product is MIT licensed (see LICENSE). Parts of it are derived from
 Apache-2.0 licensed works by The Plow Collective, Inc. ("plow-pbc"), which
 retain their original license terms:
 
-- The agent-index usage reporter service
-  (image/s6-overlay/s6-rc.d/agent-index/run) is derived from
-  plow-pbc/life-assistant-hermes-agent (Apache-2.0).
-- The vendor/client.pin mechanism and the pinned client itself
-  (standalone/agent_index_client.py from plow-pbc/agent-index-client,
-  fetched at build time) are Apache-2.0.
 - The Dockerfile and compose.yml patterns are derived from
   plow-pbc/plow-agents and plow-pbc/life-assistant-hermes-agent
   (Apache-2.0).
