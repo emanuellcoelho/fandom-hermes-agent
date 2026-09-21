@@ -6,6 +6,13 @@ curl, under a different User-Agent and a different idea of which status codes
 count. Through `kit.http`, three of them answered HTTP 202 with an empty body
 and had been dead for days. A feed is alive only if THIS path says so.
 
+What this test cannot see: it answers for the network it runs on. Every ESPN
+feed passed here from a laptop while answering 202 with an empty body to the
+container that actually reads them -- a residential address is welcome where a
+datacenter one is not, and no test run from a desk can tell you that. A green
+run proves the URL and the parser, never that production can reach it; the
+container has to be asked directly.
+
 Off by default: it is the one test that touches the network.
 
     FANDOM_LIVE_FEEDS=1 python -m pytest tests/test_feeds_live.py -q

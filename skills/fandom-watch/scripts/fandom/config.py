@@ -23,6 +23,14 @@ DEFAULTS: dict[str, Any] = {
 # because the previous list was validated with curl and three ESPN feeds sat
 # dead behind a comment claiming they were alive.
 #
+# And then they sat dead again, for a subtler reason: alive is a property of
+# the pair (feed, network), not of the feed. Every espn.com feed here answered
+# 200 from a laptop and HTTP 202 with an empty body from the container that
+# actually reads them, so the suite passed for days while production swept
+# three sources that carried nothing. hltv.org answers 403 from there for the
+# same reason. The replacements below were checked from inside the container
+# on 2026-09-21, which is the only network whose opinion counts.
+#
 # Team-specific feeds are mostly dead or bot-walled, so the design is a pure
 # alias filter over general feeds plus the subject's Google News query: any
 # single feed here can die without breaking the digest.
@@ -34,31 +42,35 @@ FEEDS = {
         "en": [
             "https://feeds.bbci.co.uk/sport/football/rss.xml",
             "https://www.theguardian.com/football/rss",
-            "https://www.espn.com/espn/rss/soccer/news",
+            "https://www.skysports.com/rss/12040",
         ],
     },
     "basquete": {
         "pt": ["https://ge.globo.com/rss/ge/"],
         "en": [
-            "https://www.espn.com/espn/rss/nba/news",
+            "https://www.cbssports.com/rss/headlines/nba/",
             "https://feeds.bbci.co.uk/sport/basketball/rss.xml",
         ],
     },
     "futebol_americano": {
         "pt": [],
         "en": [
-            "https://www.espn.com/espn/rss/nfl/news",
             "https://www.cbssports.com/rss/headlines/nfl/",
             "https://feeds.bbci.co.uk/sport/american-football/rss.xml",
         ],
     },
     # The BBC's general sport feed used to stand here and never carried a line
     # of esports, which left two of the four seeded subjects living entirely
-    # off the Google News query.
+    # off the Google News query. hltv.org replaced it and is now WAF-blocked
+    # from the container, so the competitive scene comes from esportsinsider
+    # -- rosters, splits and results -- with esports.gg for the wider circuit.
+    # dotesports stays because it is reachable, not because it is on topic:
+    # its feed has drifted to game guides, which the alias filter discards.
     "esports": {
         "pt": [],
         "en": [
-            "https://www.hltv.org/rss/news",
+            "https://esportsinsider.com/feed",
+            "https://esports.gg/feed/",
             "https://dotesports.com/feed",
         ],
     },

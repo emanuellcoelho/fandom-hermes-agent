@@ -8,10 +8,15 @@ import urllib.request
 
 # An honest identity, not a borrowed one. ESPN answers a spoofed Chrome with
 # HTTP 202 and an empty body -- a success code carrying nothing, so the sweep
-# recorded three dead feeds (nba, nfl, soccer) and said nothing. The same
-# request under this agent's own name answers 200 with the feed. Checked
-# against every source this agent reads: espn, bbc, ge.globo, google news and
-# thesportsdb all answer 200, so there is no site left that wants the pretence.
+# recorded three dead feeds (nba, nfl, soccer) and said nothing.
+#
+# Under this agent's own name ESPN answered 200, and that reading was taken
+# from a laptop. From the container it answers 202 to this User-Agent too:
+# what ESPN turns away is the address, not the name, and no header fixes an
+# address. The honest identity stays because it is the right thing to send,
+# not because it opens any door -- the ESPN feeds were dropped from
+# `fandom.config` instead. bbc, ge.globo, google news and thesportsdb answer
+# 200 from both, so there is no site left that wants the pretence.
 USER_AGENT = (
     "fandom-hermes-agent/1.0 "
     "(+https://github.com/emanuellcoelho/fandom-hermes-agent)"
