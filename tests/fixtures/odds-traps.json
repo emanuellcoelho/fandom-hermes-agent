@@ -1,0 +1,23 @@
+{
+  "_why": "Hand-built, unlike every other fixture here: it is not a provider answer but a trap set. Each pair is a real pair of clubs a board prints and an alias confuses -- Internacional against Inter Miami, three Atleticos, two Manchesters. Shaped as OddsEvent.as_dict, which is what the matcher consumes.",
+  "events": [
+    {"event_id": "t1", "sport_key": "soccer_brazil_campeonato", "sport_title": "Brasileirão Série A",
+     "commence_time": "2026-09-22T22:00:00+00:00", "home_team": "Internacional", "away_team": "Grêmio",
+     "market": "h2h", "quotes": []},
+    {"event_id": "t2", "sport_key": "soccer_usa_mls", "sport_title": "MLS",
+     "commence_time": "2026-09-22T23:30:00+00:00", "home_team": "Inter Miami CF", "away_team": "Orlando City SC",
+     "market": "h2h", "quotes": []},
+    {"event_id": "t3", "sport_key": "soccer_brazil_campeonato", "sport_title": "Brasileirão Série A",
+     "commence_time": "2026-09-23T00:00:00+00:00", "home_team": "Atlético Mineiro", "away_team": "Atlético Goianiense",
+     "market": "h2h", "quotes": []},
+    {"event_id": "t4", "sport_key": "soccer_spain_la_liga", "sport_title": "La Liga",
+     "commence_time": "2026-09-23T19:00:00+00:00", "home_team": "Atlético Madrid", "away_team": "Real Betis",
+     "market": "h2h", "quotes": []},
+    {"event_id": "t5", "sport_key": "soccer_epl", "sport_title": "EPL",
+     "commence_time": "2026-09-23T14:00:00+00:00", "home_team": "Manchester United", "away_team": "Manchester City",
+     "market": "h2h", "quotes": []},
+    {"event_id": "t6", "sport_key": "soccer_brazil_campeonato", "sport_title": "Brasileirão Série A",
+     "commence_time": "2026-09-23T22:00:00+00:00", "home_team": "São Paulo", "away_team": "Flamengo",
+     "market": "h2h", "quotes": []}
+  ]
+}

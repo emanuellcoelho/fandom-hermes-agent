@@ -32,3 +32,17 @@ def bbc_feed() -> bytes:
 def sdb_team() -> dict:
     import json
     return json.loads((FIXTURES / "sdb-corinthians.json").read_text())
+
+@pytest.fixture()
+def odds_traps() -> list:
+    """The name-trap board: hand-built, and the only fixture here that is.
+
+    Every other fixture is a real saved body, because a parser must be tested
+    against what a provider really sends. This one tests a decision, not a
+    parser: the pairs are the clubs whose names collide, shaped the way the
+    matcher consumes them.
+    """
+    import json
+    from fandom.models import OddsEvent
+    raw = json.loads((FIXTURES / "odds-traps.json").read_text())
+    return [OddsEvent.from_dict(event) for event in raw["events"]]
