@@ -24,7 +24,14 @@ Header with the date, then per followed subject — most news first:
 
 - ⚽/🏀/🏈/🎮 **name** — N notícias
 - One line per headline, link included, 🛒 *Mercado:* prefix for `transfers`
-- ⚠️ degraded sources last, with the promise to retry
+- ⚠️ sources last, read from the `sources` block, never from your own memory:
+  - `degraded` — failed today. One line, with the promise to retry tomorrow.
+  - `down` — failed for days. Name it **only** when its `announce` is `true`, and offer
+    to swap it for another feed. When `announce` is `false` the user already heard it;
+    saying it again is wallpaper, not honesty.
+  - `coverage_gap` — every feed of a sport is out. That is the sentence to write ("não
+    consegui ler nada de e-sports hoje"), not a list of three URLs.
+  - `attempted`/`answered` — the confidence line, when it helps: "13 fontes, 2 fora do ar".
 
 `"quiet": true` is the two-line version. Never invent, never restate a
 headline the JSON did not carry.
