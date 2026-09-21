@@ -17,3 +17,6 @@ tests
 assets/
 README.md
 AGENTS.md
+# The odds edge is deployed to Cloudflare, not shipped inside the agent. The
+# agent only ever calls its URL.
+edge/

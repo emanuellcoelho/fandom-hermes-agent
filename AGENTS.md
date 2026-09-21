@@ -19,7 +19,7 @@ the change goes.
 | `skills/fandom-watch/scripts/kit/` | generic infrastructure: clock, http, jsonio — domain-free | anything that knows what a match is |
 | `fandom/engine/odds*.py` | de-vig, consensus, the odds file, the credit ledger, board name matching | fetching, and any human word about a price |
 | `fandom/sources/odds.py` | calling the board and stripping the key out of every URL that leaves | what a probability means |
-| the odds edge (outside this repo) | holding the API key, caching, speaking v4 verbatim | anything this suite can test — it is operated elsewhere |
+| `edge/` | the Worker that holds the API key, caches, and speaks v4 verbatim | anything the Python suite covers — it runs on Cloudflare, not in the image, and `.dockerignore` keeps it out |
 | `image/` | s6 services (agent-index reporter), TZ cont-init | gateway config, plow-init — the base's |
 | `vendor/client.pin` | which agent-index-client commit runs inside the agent | a vendored copy that drifts |
 | `Dockerfile` / `compose.yml` | how this content ships | base-image behavior |
@@ -43,8 +43,11 @@ signatures, same meanings — a function added to one belongs in the other, and
   one; a headline exists only when `news` output it.
 - **Writes are atomic** (`kit.jsonio.save_json_atomic`).
 - **No credential in this tree.** The odds board needs a key; the agent does
-  not carry it. An edge outside this repo holds it and speaks the provider's
-  API verbatim, so the agent calls a public URL. The one function allowed to
+  not carry it. The Worker in `edge/` holds it and speaks the provider's API
+  verbatim, so the agent calls a public URL. That directory is deployed to
+  Cloudflare and never enters the image -- `.dockerignore` sees to it -- and
+  the key reaches it through `wrangler secret put`, so it exists in no file
+  here. The one function allowed to
   read `ODDS_API_KEY` is `sources/odds.py::_base_and_auth`, for development
   against the origin, and it writes nothing. Every URL that leaves that
   module is redacted, because `source_health` keys its record by URL and

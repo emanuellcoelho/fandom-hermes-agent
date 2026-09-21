@@ -1,0 +1,11 @@
+# The odds edge. Deployed to Cloudflare from here; it is not part of the
+# agent's image and `.dockerignore` keeps this directory out of the build.
+name = "fandom-odds-edge"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# The key is a secret, never a var: `wrangler secret put ODDS_API_KEY` reads
+# it from stdin, so it never lands in this file, in a shell history or in a
+# process listing.
+#
+#   [vars]          <- deliberately absent
