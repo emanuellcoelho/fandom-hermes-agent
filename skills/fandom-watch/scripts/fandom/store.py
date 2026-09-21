@@ -100,4 +100,5 @@ class FandomStore:
             "key": team.key, "name": team.name, "sport": str(team.sport),
             "league": team.league, "aliases": team.aliases,
             "source_id": team.source_id, "extra_feeds": len(team.feeds),
+            "odds_linked": bool(team.odds_sport),
         }

@@ -58,6 +58,21 @@ class TestStore:
     def test_slug_dedups_accents(self):
         assert team_key_for("São Paulo FC") == team_key_for("sao paulo fc")
 
+    def test_a_teams_file_written_before_odds_existed_still_loads(self):
+        """Every home already on disk predates odds_sport. None may need a migration."""
+        team = Team.from_dict({"key": "gremio", "name": "Grêmio", "sport": "futebol",
+                               "aliases": ["gremio"], "source_id": "133739"})
+        assert team.odds_sport is None and team.odds_key is None
+
+    def test_the_odds_link_survives_a_save_and_a_reload(self, store):
+        store.add(Team(key="flamengo", name="Flamengo", sport=Sport.FUTEBOL,
+                       odds_sport="soccer_brazil_campeonato", odds_key="Flamengo"))
+        store.save()
+        reloaded = type(store)(store.home).get("flamengo")
+        assert reloaded.odds_sport == "soccer_brazil_campeonato"
+        assert reloaded.odds_key == "Flamengo"
+        assert store.compact_view(reloaded)["odds_linked"] is True
+
 
 class TestConfig:
     def test_missing_keys_on_raw_file(self, tmp_path):
