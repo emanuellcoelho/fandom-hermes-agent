@@ -17,13 +17,20 @@ the change goes.
 | `skills/fandom-news/` | the morning digest conversation and sports small-talk | news filtering (engine owns those) |
 | `skills/fandom-onboarding/` | first contact, config questions, cron registration | the engine's defaults (config.py owns those) |
 | `skills/fandom-watch/scripts/kit/` | generic infrastructure: clock, http, jsonio — domain-free | anything that knows what a match is |
+| `fandom/engine/odds*.py` | de-vig, consensus, the odds file, the credit ledger, board name matching | fetching, and any human word about a price |
+| `fandom/sources/odds.py` | calling the board and stripping the key out of every URL that leaves | what a probability means |
+| the odds edge (outside this repo) | holding the API key, caching, speaking v4 verbatim | anything this suite can test — it is operated elsewhere |
 | `image/` | s6 services (agent-index reporter), TZ cont-init | gateway config, plow-init — the base's |
 | `vendor/client.pin` | which agent-index-client commit runs inside the agent | a vendored copy that drifts |
 | `Dockerfile` / `compose.yml` | how this content ships | base-image behavior |
 
 Sibling repo: [`vigia-hermes-agent`](https://github.com/emanuellcoelho/vigia-hermes-agent)
-shares this structure; `kit/` stays byte-identical across forks until a
-second fork confirms the pattern graduates it into a package.
+shares this structure. `kit/` is **compatible, not byte-identical**: the two
+copies of `http.py` already differ, in the User-Agent (Vigia still sends a
+browser's; this one sends its own name, which is what stopped ESPN answering
+202 with an empty body) and in the retry backoff. Same names, same
+signatures, same meanings — a function added to one belongs in the other, and
+`fetch_headers` is the next thing to carry across.
 
 ## Conventions
 
@@ -35,6 +42,14 @@ second fork confirms the pattern graduates it into a package.
 - **Honesty is architectural**: a score exists only when `matchday` returned
   one; a headline exists only when `news` output it.
 - **Writes are atomic** (`kit.jsonio.save_json_atomic`).
+- **No credential in this tree.** The odds board needs a key; the agent does
+  not carry it. An edge outside this repo holds it and speaks the provider's
+  API verbatim, so the agent calls a public URL. The one function allowed to
+  read `ODDS_API_KEY` is `sources/odds.py::_base_and_auth`, for development
+  against the origin, and it writes nothing. Every URL that leaves that
+  module is redacted, because `source_health` keys its record by URL and
+  writes it to disk; `test_odds_cli.py` walks the whole home reading bytes to
+  prove it.
 - **State lives in `/var/lib/hermes/fandom/`** (override `FANDOM_HOME` for
   tests). Nothing under this tree carries a credential, a chat id, or
   personal data.
@@ -50,9 +65,11 @@ Never in a commit: `plow-credentials`, state files, anything under a
 
 ## Tests
 
-A URL only enters `config.FEEDS` after `tests/test_feeds_live.py` passes on it:
+A URL only enters `config.FEEDS` — or `sources/odds.py::_EDGE_DEFAULT` — after
+its live test passes on it:
 
     FANDOM_LIVE_FEEDS=1 python -m pytest tests/test_feeds_live.py -q
+    FANDOM_LIVE_ODDS=1 python -m pytest tests/test_odds_live.py -q
 
 It fetches through `kit.http`, the same path production uses. Validating a feed
 with curl proves nothing about this agent -- ESPN answered our old spoofed

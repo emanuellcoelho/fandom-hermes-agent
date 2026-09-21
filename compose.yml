@@ -22,7 +22,14 @@ services:
       AGENT_ID: fandom
       # Professional scraping fallback (scraperapi.com) -- revives ESPN-style
       # JSON APIs this network cannot reach directly. Empty = disabled.
+      # Declared and not yet read by any code: an env var nobody reads is a
+      # setting that looks configured and is not.
       SCRAPERAPI_KEY: ${SCRAPERAPI_KEY:-}
+      # The public edge that holds the odds key and speaks the provider's v4
+      # verbatim. The agent never carries the credential itself -- this image
+      # is public and its home holds no secret. Empty = no cotacao, which the
+      # engine answers with reason "unconfigured" and nobody crashes over.
+      ODDS_EDGE_BASE: ${ODDS_EDGE_BASE:-}
     volumes:
       # The agent's home, kept across `up`/`down` for its sessions, memory and
       # followed teams. `docker compose down -v` starts this agent fresh.
