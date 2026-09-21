@@ -53,28 +53,42 @@ Finished means `fandom.py teams list` answers `onboarding_missing: []`.
    `teams remove` as soon as they tell you what they follow, rather than
    leaving a Brazilian league in the morning digest of someone in Chicago.
 
-## Timezone is fixed at boot
+## Registering the schedules (as soon as the config is complete)
 
-The container's `TZ` is set from `timezone` in the config **when the
-container starts**. After saving a timezone, compare with `echo $TZ`:
+**Never postpone this.** The container's `TZ` is written once, at boot, from a
+config the user had not filled in yet — so after onboarding it is almost
+always UTC while the user lives somewhere else. The old instruction here was
+to wait for a restart that realigns them. Nobody restarts a cloud agent: this
+agent ran five days in production with no schedule at all, and the morning
+roundup is the whole product.
 
-- Same: register the schedules now (below).
-- Different: say the zone lands "no próximo reinício" and register only after
-  that restart. **Never register schedules whose zone disagrees with the
-  container** — they would fire at the wrong local hour, silently.
+Ask the engine for the specs instead of doing the arithmetic yourself:
 
-## Registering the schedules (after config is complete)
+    fandom.py schedule
+
+    {"timezone": "America/Sao_Paulo", "container_tz": "UTC", "aligned": false,
+     "drifts_after_dst": false,
+     "digest":   {"name": "fandom-digest",   "local": ["08:30"], "fires": ["11:30"],
+                  "cron": "30 11 * * *", "enabled": true},
+     "matchday": {"name": "fandom-matchday", "local": ["12:00","19:00"],
+                  "fires": ["15:00","22:00"], "cron": "0 15,22 * * *"}}
+
+`cron` is the field to register, always — it is the user's local hour restated
+in the zone the job will actually fire in. `local` is what you say to them
+("o resumo cai às 08:30"); `fires` is the same instant in the container's zone
+and is never spoken aloud. An empty `cron` means the time could not be parsed:
+ask again rather than registering a guess.
 
 Registered once, by you, from a turn (a turn carries the gateway's
 environment; a bare exec does not):
 
-    /opt/hermes/bin/hermes cron create "30 8 * * *" \
+    /opt/hermes/bin/hermes cron create "<digest.cron>" \
       "Run the fandom digest now: execute fandom.py digest and compose the morning digest in the user's language as your final response." \
       --name fandom-digest --skill fandom-news \
       --model anthropic/claude-sonnet-5 --provider plow \
       --deliver "plow_chat:${PLOW_HOME_CHANNEL}"
 
-    /opt/hermes/bin/hermes cron create "0 12,19 * * *" \
+    /opt/hermes/bin/hermes cron create "<matchday.cron>" \
       "Run the fandom matchday now: execute fandom.py matchday, and only if a followed team has a game today or a fresh result, compose the matchday message in the user's language and post it with post_chat.py; otherwise post nothing and end with NO_REPLY." \
       --name fandom-matchday --skill fandom-watch \
       --model anthropic/claude-sonnet-5 --provider plow
@@ -82,6 +96,23 @@ environment; a bare exec does not):
 A cron created without `--model` and `--provider` lands with no LLM provider
 and fails every run with "No LLM provider configured" — always pass both.
 
-The digest's `30 8` follows the user's `digest_time` (re-register after a
-change — remove the old job first with `hermes cron remove fandom-digest`).
-If a job already exists, skip it — never duplicate a schedule.
+`digest.enabled: false` means they declined the roundup: register the matchday
+job anyway and skip the digest.
+
+### When the conversion can go stale
+
+`drifts_after_dst: true` means the user's zone changes offset during the year
+(most of Europe and North America; Brazil has not since 2019). A converted job
+is exact until that transition and an hour off after it, because the container
+does not follow a zone it was never told about. Two things follow:
+
+- Say nothing about it during onboarding. It is a detail about infrastructure,
+  and the schedule is correct today.
+- Re-run `fandom.py schedule` and re-register whenever the agent restarts, and
+  after any offset change. When `aligned` is true the conversion disappears and
+  the drift cannot happen at all — a restart is the cure, not a prerequisite.
+
+After any change to `timezone` or `digest_time`, re-run `fandom.py schedule`,
+remove the old job (`hermes cron remove fandom-digest`) and create it again.
+If a job already exists and its spec still matches, leave it — never duplicate
+a schedule.

@@ -56,7 +56,11 @@ signatures, same meanings — a function added to one belongs in the other, and
 - **State lives in `/var/lib/hermes/fandom/`** (override `FANDOM_HOME` for
   tests). Nothing under this tree carries a credential, a chat id, or
   personal data.
-- **TZ is fixed at boot** from `fandom/config.json`.
+- **TZ is fixed at boot** from `fandom/config.json`, and **no schedule waits
+  for it**. `hermes cron create` has no per-job zone, so `fandom.py schedule`
+  restates the user's local hour in the zone the container is actually running
+  in. Waiting for a restart to realign them is what left this agent five days
+  in production with no cron at all.
 
 ## Commits
 
@@ -89,8 +93,8 @@ no clock sleeps.
 
 | name | schedule (container TZ) | deliver |
 | --- | --- | --- |
-| `fandom-digest` | `30 8 * * *` (onboarding writes the user's time) | native `--deliver` to `plow_chat:${PLOW_HOME_CHANNEL}` |
-| `fandom-matchday` | `0 12,19 * * *` | post_chat.py only when there is a game/result; quiet = NO_REPLY |
+| `fandom-digest` | `fandom.py schedule` → `digest.cron` (the user's time, in the container's zone) | native `--deliver` to `plow_chat:${PLOW_HOME_CHANNEL}` |
+| `fandom-matchday` | `fandom.py schedule` → `matchday.cron` (12:00/19:00 local) | post_chat.py only when there is a game/result; quiet = NO_REPLY |
 
 Changing these rows is an edit to `fandom-onboarding/SKILL.md` and this table
 together.

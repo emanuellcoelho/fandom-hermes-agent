@@ -12,6 +12,7 @@ Commands:
     odds link <key> --sport-key K (--name N | --league)
     odds sports [--sport S]                     what the board carries, free
     digest                                      the morning payload
+    schedule                                    the cron specs to register
     config get | config set KEY=VALUE ...
 
 Exit 0 on success, 2 on failure with an `error` field. stdout is data only.
@@ -34,6 +35,7 @@ from fandom import store as store_module  # noqa: E402
 from fandom.engine import digest, matchday  # noqa: E402
 from fandom.engine import odds as odds_engine  # noqa: E402
 from fandom.engine import odds_match, odds_store  # noqa: E402
+from fandom.engine import schedule as schedule_engine  # noqa: E402
 from fandom.models import _SPORT_ALIASES, Sport, Team  # noqa: E402
 from fandom import sources as sources_module  # noqa: E402
 from fandom.sources import odds as odds_source  # noqa: E402
@@ -374,6 +376,19 @@ def cmd_odds_sports(args: argparse.Namespace) -> int:
     return emit({"sports": sports, "cost": 0})
 
 
+def cmd_schedule(args: argparse.Namespace) -> int:
+    """The schedules this agent should have, in the zone the container runs in.
+
+    `hermes cron create` has no per-job zone, so a job fires in the container's
+    TZ -- written once, at boot, from a config the user had not filled in yet.
+    Waiting for a restart to fix that is what left this agent five days in
+    production with no schedule at all. This converts instead: the same
+    instant, named in the zone that will actually be used.
+    """
+    settings = fandom_config.load(HOME)
+    return emit(schedule_engine.plan(settings, container_tz=os.environ.get("TZ")))
+
+
 def cmd_config(args: argparse.Namespace) -> int:
     if args.action == "get":
         return emit(fandom_config.load(HOME))
@@ -444,6 +459,8 @@ def main() -> int:
     sports.set_defaults(run=cmd_odds_sports)
 
     verbs.add_parser("digest").set_defaults(run=cmd_digest)
+
+    verbs.add_parser("schedule").set_defaults(run=cmd_schedule)
 
     it = verbs.add_parser("config")
     it.add_argument("action", choices=["get", "set"])
