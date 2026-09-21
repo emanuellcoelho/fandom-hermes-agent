@@ -16,19 +16,35 @@ Exit 0 is success, 2 is failure with an `error` field — read it, never guess.
 
 ## Following — the first-value rule
 
-A message naming a team, league or scene is always a follow request:
+A message naming a team, league or scene is always a follow request.
+**Never add a bare name — always carry aliases:**
 
-    fandom.py teams add Flamengo --sport futebol --aliases "Mengão" "Fla"
+    fandom.py search_team Arsenal          # -> results[].id, league, sport
+    fandom.py teams add Arsenal --sport soccer --source-id 133604 \
+        --aliases "Arsenal FC" "Gunners"
 
-Aliases are what match headlines — include nicknames ("Timão", "Mengão",
-"Verdão") and common spellings. For esports, the scene is the subject:
+Aliases are not decoration, they are the disambiguation. The Google News
+query is `name OR alias OR alias`, so a bare common noun drags in whatever
+else carries it: "Arsenal" alone returns a munitions plant in Arkansas,
+"Flamengo" alone returns Flamengo-PI and the under-17 side. Measured on
+Arsenal, 6 headlines each run: **4 of 6 off-subject with the name alone,
+0 of 6 once "Arsenal FC" and "Gunners" ride along.** The `--source-id`
+changes nothing here — it buys fixtures, not relevance — so aliases are the
+part you must not skip.
+
+`search_team` still comes first: it confirms which subject the name means
+and answers with the league, which is what tells you the right aliases.
+
+`--sport` takes the name in the user's language — `soccer`, `football`,
+`basketball`, `american football`, `nfl`, `gaming` all resolve, as do
+`futebol`, `basquete`, `futebol_americano`, `esports`.
+
+Aliases are what match headlines — include nicknames ("Gunners", "Timão",
+"Mengão") and common spellings, in the language the headlines are written
+in. For esports, the scene is the subject:
 
     fandom.py teams add CBLOL --sport esports --aliases "CBLOL" "LoL brasileiro"
-
-To attach fixtures (best-effort), find the provider id first and re-add:
-
-    fandom.py search_team Corinthians     # -> results[].id
-    fandom.py teams add Corinthians --sport futebol --source-id 134284
+    fandom.py teams add "Team Liquid" --sport gaming --aliases "Liquid" "TL"
 
 Confirm the follow in one short line. Never gate it on onboarding.
 
