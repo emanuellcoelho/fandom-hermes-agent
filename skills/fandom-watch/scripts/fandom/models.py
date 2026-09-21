@@ -14,6 +14,39 @@ class Sport(StrEnum):
     FUTEBOL_AMERICANO = "futebol_americano"
     ESPORTS = "esports"
 
+    @classmethod
+    def parse(cls, raw: str) -> "Sport":
+        """The sport by any of its names, including the English ones.
+
+        The stored values stay Portuguese because the store files are
+        contracts and renaming them would orphan every existing home. What
+        widens is the door: a user who says "basketball" is not asking for a
+        different sport than one who says "basquete", and answering
+        `unknown sport` to the first is a bug, not a language policy.
+
+        "football" resolves to futebol, the way most of the world uses the
+        word; American football answers to "american football" and "nfl".
+        """
+        key = "_".join(str(raw).strip().lower().replace("-", " ").split())
+        return cls(_SPORT_ALIASES.get(key, key))
+
+
+_SPORT_ALIASES = {
+    "soccer": Sport.FUTEBOL,
+    "football": Sport.FUTEBOL,
+    "futbol": Sport.FUTEBOL,
+    "fútbol": Sport.FUTEBOL,
+    "basketball": Sport.BASQUETE,
+    "basket": Sport.BASQUETE,
+    "nba": Sport.BASQUETE,
+    "american_football": Sport.FUTEBOL_AMERICANO,
+    "americanfootball": Sport.FUTEBOL_AMERICANO,
+    "nfl": Sport.FUTEBOL_AMERICANO,
+    "e_sports": Sport.ESPORTS,
+    "esport": Sport.ESPORTS,
+    "gaming": Sport.ESPORTS,
+}
+
 
 @dataclass
 class Team:
