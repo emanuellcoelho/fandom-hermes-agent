@@ -11,7 +11,7 @@ from fandom.models import Team, NewsItem
 
 
 def build(teams: list[Team], items: list[NewsItem], failed_sources: list[str],
-          *, per_team_limit: int = 5) -> dict[str, Any]:
+          *, per_team_limit: int = 5, sources: dict[str, Any] | None = None) -> dict[str, Any]:
     """Teams with their headlines, transfers flagged, failures named."""
     buckets = news_filter.filter_news(items, teams)
     followed: list[dict[str, Any]] = []
@@ -33,4 +33,7 @@ def build(teams: list[Team], items: list[NewsItem], failed_sources: list[str],
         "failed_sources": sorted(set(failed_sources)),
         "quiet": bool(teams) and all(entry["count"] == 0 for entry in followed),
         "sources_read": len(items),
+        # Built by the caller, which is what reads and writes the health file:
+        # this stays pure.
+        "sources": sources or {},
     }

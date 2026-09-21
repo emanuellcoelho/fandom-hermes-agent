@@ -96,6 +96,34 @@ def _sweep(teams, settings):
     return items, sources_module.failures(outcomes), outcomes
 
 
+def _sports_planned(teams, settings) -> dict[str, list[str]]:
+    """Which URLs stand behind each followed sport, for the coverage check."""
+    planned: dict[str, list[str]] = {}
+    for team in teams:
+        urls = sources_module.urls_for(team, language=str(settings["language"]))
+        planned.setdefault(str(team.sport), []).extend(urls)
+    return planned
+
+
+def _record_health(store, outcomes, teams, settings, *, announce: bool = False):
+    """Fold this run into the health file and return the payload's `sources` block.
+
+    Only the digest passes announce=True: an ad-hoc `news` must not burn the
+    weekly announcement for a source the morning message has yet to mention.
+    """
+    from fandom.engine import source_health
+    health = source_health.record(store.health, outcomes)
+    block = source_health.report(health, outcomes,
+                                 sports_planned=_sports_planned(teams, settings))
+    if announce:
+        announced = [entry["url"] for entry in block["down"] if entry.get("announce")]
+        if announced:
+            health = source_health.mark_announced(health, announced)
+    health = source_health.prune(health, [outcome.url for outcome in outcomes])
+    store.save_health(health)
+    return block
+
+
 def cmd_search_team(args: argparse.Namespace) -> int:
     try:
         candidates = thesportsdb.search_team(" ".join(args.words))
@@ -115,6 +143,7 @@ def cmd_news(args: argparse.Namespace) -> int:
     for bucket in buckets.values():
         cache.extend(item.as_dict() for item in bucket)
     store.save_news(cache)
+    health_block = _record_health(store, outcomes, teams, settings)
     return emit({
         "at": clock.iso(),
         "teams": {key: [item.as_dict() for item in bucket[:args.limit]]
@@ -122,6 +151,7 @@ def cmd_news(args: argparse.Namespace) -> int:
         "failed_sources": failed,
         "sources_read": sum(1 for outcome in outcomes if outcome.ok),
         "items_read": len(items),
+        "sources": health_block,
     })
 
 
@@ -161,8 +191,10 @@ def cmd_digest(args: argparse.Namespace) -> int:
     teams = store.all()
     settings = fandom_config.load(HOME)
     items, failed, outcomes = _sweep(teams, settings)
+    health_block = _record_health(store, outcomes, teams, settings, announce=True)
     payload = digest.build(teams, items, failed,
-                           per_team_limit=int(settings["news_limit_per_team"]))
+                           per_team_limit=int(settings["news_limit_per_team"]),
+                           sources=health_block)
     payload["timezone"] = settings["timezone"]
     return emit(payload)
 

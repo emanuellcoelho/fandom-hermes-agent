@@ -1,4 +1,4 @@
-"""The followed-teams store and the news cache: two JSON files, written whole."""
+"""The followed-teams store, the news cache and source health: JSON, written whole."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from fandom.models import Sport, Team
 
 _TEAMS_FILE = "teams.json"
 _NEWS_FILE = "news.json"
+_HEALTH_FILE = "sources.json"
 
 
 def teams_path(home: str) -> str:
@@ -19,6 +20,10 @@ def teams_path(home: str) -> str:
 
 def news_path(home: str) -> str:
     return f"{home}/{_NEWS_FILE}"
+
+
+def health_path(home: str) -> str:
+    return f"{home}/{_HEALTH_FILE}"
 
 
 def team_key_for(name: str) -> str:
@@ -37,14 +42,28 @@ class FandomStore:
         self.teams: dict[str, Team] = {
             data["key"]: Team.from_dict(data) for data in raw.get("teams", [])
         }
-        self.news_cache: dict[str, Any] = load_json(news_path(home), {"items": []}) or {}
+        # How each source has behaved across runs, keyed by URL. Read by the
+        # health engine; a single run cannot tell a hiccup from a week of silence.
+        self.health: dict[str, Any] = load_json(health_path(home), {"sources": {}}) or {}
 
     def save(self) -> None:
         save_json_atomic(teams_path(self.home),
                          {"teams": [team.as_dict() for team in self.teams.values()]})
 
     def save_news(self, items: list[dict[str, Any]]) -> None:
+        """The last run's matched items, for inspection.
+
+        Nothing reads this back, and that is on purpose. It used to be loaded
+        into `self.news_cache` on every construction, which made it look like a
+        cache -- but no caller ever consulted it, so it was load cost for
+        nothing. Serving yesterday's headlines as today's would break the rule
+        the persona is built on: if it did not come out of today's script, it
+        is not today's news.
+        """
         save_json_atomic(news_path(self.home), {"items": items})
+
+    def save_health(self, health: dict[str, Any]) -> None:
+        save_json_atomic(health_path(self.home), health)
 
     def seed_defaults(self) -> bool:
         """Install the BR seed once, into an empty store only."""
