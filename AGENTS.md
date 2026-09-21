@@ -50,6 +50,16 @@ Never in a commit: `plow-credentials`, state files, anything under a
 
 ## Tests
 
+A URL only enters `config.FEEDS` after `tests/test_feeds_live.py` passes on it:
+
+    FANDOM_LIVE_FEEDS=1 python -m pytest tests/test_feeds_live.py -q
+
+It fetches through `kit.http`, the same path production uses. Validating a feed
+with curl proves nothing about this agent -- ESPN answered our old spoofed
+User-Agent with HTTP 202 and an empty body while answering curl with the feed,
+and three sources stayed dead for days behind a comment saying they were alive.
+
+
     python3 -m pytest tests/ -q
 
 Pure and fixture-fed: real saved RSS bodies and provider answers, no network,

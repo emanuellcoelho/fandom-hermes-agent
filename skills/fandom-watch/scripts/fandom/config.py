@@ -18,26 +18,71 @@ DEFAULTS: dict[str, Any] = {
     "matchday_times": ["12:00", "19:00"],
 }
 
-# Feeds that proved alive on 2026-09-13, per sport. Team-specific feeds are
-# mostly dead in Brazil -- the pure alias filter over general feeds is the
-# design, and any feed here can die without breaking the digest.
+# Feeds per sport, then per language. Every URL here passed
+# tests/test_feeds_live.py through kit.http -- the path production uses --
+# because the previous list was validated with curl and three ESPN feeds sat
+# dead behind a comment claiming they were alive.
+#
+# Team-specific feeds are mostly dead or bot-walled, so the design is a pure
+# alias filter over general feeds plus the subject's Google News query: any
+# single feed here can die without breaking the digest.
 FEEDS = {
-    "futebol": [
-        "https://ge.globo.com/rss/ge/",
-        "https://www.espn.com/espn/rss/soccer/news",
-    ],
-    "basquete": [
-        "https://www.espn.com/espn/rss/nba/news",
-        "https://feeds.bbci.co.uk/sport/rss.xml",
-    ],
-    "futebol_americano": [
-        "https://www.espn.com/espn/rss/nfl/news",
-        "https://feeds.bbci.co.uk/sport/rss.xml",
-    ],
-    "esports": [
-        "https://feeds.bbci.co.uk/sport/rss.xml",
-    ],
+    "futebol": {
+        # uol.com.br was a candidate and was cut here: it answers 200 with an
+        # <rss> root and malformed XML inside. The live harness caught it.
+        "pt": ["https://ge.globo.com/rss/ge/"],
+        "en": [
+            "https://feeds.bbci.co.uk/sport/football/rss.xml",
+            "https://www.theguardian.com/football/rss",
+            "https://www.espn.com/espn/rss/soccer/news",
+        ],
+    },
+    "basquete": {
+        "pt": ["https://ge.globo.com/rss/ge/"],
+        "en": [
+            "https://www.espn.com/espn/rss/nba/news",
+            "https://feeds.bbci.co.uk/sport/basketball/rss.xml",
+        ],
+    },
+    "futebol_americano": {
+        "pt": [],
+        "en": [
+            "https://www.espn.com/espn/rss/nfl/news",
+            "https://www.cbssports.com/rss/headlines/nfl/",
+            "https://feeds.bbci.co.uk/sport/american-football/rss.xml",
+        ],
+    },
+    # The BBC's general sport feed used to stand here and never carried a line
+    # of esports, which left two of the four seeded subjects living entirely
+    # off the Google News query.
+    "esports": {
+        "pt": [],
+        "en": [
+            "https://www.hltv.org/rss/news",
+            "https://dotesports.com/feed",
+        ],
+    },
 }
+
+
+def feeds_for(sport: str, language: str = "") -> list[str]:
+    """This sport's feeds for this user: their language first, English as floor.
+
+    A Brazilian wants the ge AND the Champions League off the BBC, so pt-BR
+    gets both with pt first. Someone in Chicago has no use for ge.globo, so a
+    non-pt language gets English only. An empty language means onboarding has
+    not asked yet, and the seed is Brazilian, so it keeps the pt+en reach.
+    """
+    buckets = FEEDS.get(str(sport), {})
+    lang = (language or "").strip().lower()[:2]
+    wanted = [lang, "en"] if lang else ["pt", "en"]
+    urls: list[str] = []
+    for key in wanted:
+        for url in buckets.get(key, []):
+            if url not in urls:
+                urls.append(url)
+    return urls
+
 
 # The demo seed: Brasileirão, CBLOL, NBA. Onboarding replaces or extends it.
 SEED_TEAMS: list[dict[str, Any]] = [

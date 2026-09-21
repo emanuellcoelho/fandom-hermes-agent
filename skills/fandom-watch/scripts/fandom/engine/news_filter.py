@@ -53,7 +53,11 @@ def filter_news(items: list[NewsItem], teams: list[Team]) -> dict[str, list[News
     """
     seen: set[str] = set()
     buckets: dict[str, list[NewsItem]] = {team.key: [] for team in teams}
-    for item in sorted(items, key=lambda i: i.published_at, reverse=True):
+    # The link breaks ties on the timestamp. Sources are read concurrently now,
+    # so arrival order is no longer stable between runs -- without a tiebreak,
+    # two headlines published in the same second could swap places run to run,
+    # and with dedup-by-link that changes which copy survives.
+    for item in sorted(items, key=lambda i: (i.published_at, i.link), reverse=True):
         if item.link in seen:
             continue
         seen.add(item.link)

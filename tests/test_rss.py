@@ -51,13 +51,20 @@ class TestEdgeCases:
 
 class TestCollect:
     def test_dead_feed_degrades_never_dies(self, monkeypatch):
-        from fandom.sources import collect_news
+        from fandom import sources
+        from fandom.models import Sport, Team
+
         def boom(url, **kw):
             raise HttpError("blocked")
+
         monkeypatch.setattr(rss.http, "fetch", boom)
-        items, failed = collect_news([], "futebol")
+        team = Team(key="arsenal", name="Arsenal", sport=Sport.FUTEBOL)
+        plan = sources.sweep_plan([team], language="pt-BR")
+        items, outcomes = sources.sweep(plan)
         assert items == []
-        assert len(failed) >= 2  # both futebol feeds reported as degraded
+        assert len(sources.failures(outcomes)) >= 2  # every feed reported, none fatal
+        assert all(not outcome.ok for outcome in outcomes)
+
 class TestWhatCountsAsAFeed:
     """The root-element gate: feed shapes pass, pages do not, quiet stays quiet."""
 

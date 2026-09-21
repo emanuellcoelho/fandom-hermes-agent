@@ -29,8 +29,8 @@ from kit import clock  # noqa: E402
 from fandom import config as fandom_config  # noqa: E402
 from fandom import store as store_module  # noqa: E402
 from fandom.engine import digest, matchday  # noqa: E402
-from fandom.models import Sport, Team  # noqa: E402
-from fandom.sources import collect_news  # noqa: E402
+from fandom.models import _SPORT_ALIASES, Sport, Team  # noqa: E402
+from fandom import sources as sources_module  # noqa: E402
 from fandom.sources import thesportsdb  # noqa: E402
 from fandom.store import FandomStore  # noqa: E402
 
@@ -68,9 +68,10 @@ def cmd_teams(args: argparse.Namespace) -> int:
     if not name:
         return fail("team name is required")
     try:
-        sport = Sport(args.sport)
+        sport = Sport.parse(args.sport)
     except ValueError:
-        return fail(f"unknown sport {args.sport!r} -- one of {sorted(s.value for s in Sport)}")
+        names = sorted(s.value for s in Sport) + sorted(_SPORT_ALIASES)
+        return fail(f"unknown sport {args.sport!r} -- one of {names}")
     team = Team(
         key=store_module.team_key_for(name),
         name=name, sport=sport,
@@ -83,12 +84,16 @@ def cmd_teams(args: argparse.Namespace) -> int:
     return emit({"added": store.compact_view(team)})
 
 
-def _collect(team, settings):
-    """One subject's news sweep, in the user's language."""
-    return collect_news(
-        team.feeds, str(team.sport),
-        name=team.name, aliases=team.aliases, language=str(settings["language"]),
-    )
+def _sweep(teams, settings):
+    """The whole followed set's news, read once per distinct URL.
+
+    Returns (items, failed, outcomes). `failed` keeps the shape the skills
+    already read; `outcomes` carries one entry per source, answered or not,
+    which is what lets a caller count sources instead of guessing from items.
+    """
+    plan = sources_module.sweep_plan(teams, language=str(settings["language"]))
+    items, outcomes = sources_module.sweep(plan)
+    return items, sources_module.failures(outcomes), outcomes
 
 
 def cmd_search_team(args: argparse.Namespace) -> int:
@@ -104,11 +109,7 @@ def cmd_news(args: argparse.Namespace) -> int:
     store.seed_defaults()  # the BR seed, once, into an empty store
     teams = store.all()
     settings = fandom_config.load(HOME)
-    items, failed = [], []
-    for team in teams:
-        team_items, team_failed = _collect(team, settings)
-        items.extend(team_items)
-        failed.extend(team_failed)
+    items, failed, outcomes = _sweep(teams, settings)
     buckets = _filter(items, teams)
     cache = []
     for bucket in buckets.values():
@@ -119,7 +120,8 @@ def cmd_news(args: argparse.Namespace) -> int:
         "teams": {key: [item.as_dict() for item in bucket[:args.limit]]
                   for key, bucket in buckets.items()},
         "failed_sources": failed,
-        "sources_read": len(items),
+        "sources_read": sum(1 for outcome in outcomes if outcome.ok),
+        "items_read": len(items),
     })
 
 
@@ -141,11 +143,7 @@ def cmd_live(args: argparse.Namespace) -> int:
     store.seed_defaults()
     teams = store.all()
     settings = fandom_config.load(HOME)
-    items, failed = [], []
-    for team in teams:
-        team_items, team_failed = _collect(team, settings)
-        items.extend(team_items)
-        failed.extend(team_failed)
+    items, failed, _outcomes = _sweep(teams, settings)
     from fandom.engine import live
     payload = {
         "at": clock.iso(),
@@ -162,11 +160,7 @@ def cmd_digest(args: argparse.Namespace) -> int:
     store.seed_defaults()
     teams = store.all()
     settings = fandom_config.load(HOME)
-    items, failed = [], []
-    for team in teams:
-        team_items, team_failed = _collect(team, settings)
-        items.extend(team_items)
-        failed.extend(team_failed)
+    items, failed, outcomes = _sweep(teams, settings)
     payload = digest.build(teams, items, failed,
                            per_team_limit=int(settings["news_limit_per_team"]))
     payload["timezone"] = settings["timezone"]
