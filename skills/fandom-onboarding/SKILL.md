@@ -93,8 +93,16 @@ environment; a bare exec does not):
       --name fandom-matchday --skill fandom-watch \
       --model anthropic/claude-sonnet-5 --provider plow
 
-A cron created without `--model` and `--provider` lands with no LLM provider
-and fails every run with "No LLM provider configured" — always pass both.
+**Use this CLI, not the scheduling tool.** A job created through the generic
+scheduling tool lands with `model: null`, because that tool has no way to set
+one — and a job with a provider and no model passes validation, then fails
+every single run with "No LLM provider configured". The message misleads: the
+provider is there, the model is what is missing. It killed `fipe-sweep` for
+two rounds on 16/09 and it cost this agent its first evening of schedules on
+21/09. Always pass both flags, and check afterwards:
+
+    /opt/hermes/bin/hermes cron list            # the `model` field, not just `provider`
+    /opt/hermes/bin/hermes cron edit <job_id> --model anthropic/claude-sonnet-5 --provider plow
 
 `digest.enabled: false` means they declined the roundup: register the matchday
 job anyway and skip the digest.
