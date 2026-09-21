@@ -12,6 +12,7 @@ from fandom.models import Sport, Team
 _TEAMS_FILE = "teams.json"
 _NEWS_FILE = "news.json"
 _HEALTH_FILE = "sources.json"
+_ODDS_FILE = "odds.json"
 
 
 def teams_path(home: str) -> str:
@@ -24,6 +25,10 @@ def news_path(home: str) -> str:
 
 def health_path(home: str) -> str:
     return f"{home}/{_HEALTH_FILE}"
+
+
+def odds_path(home: str) -> str:
+    return f"{home}/{_ODDS_FILE}"
 
 
 def team_key_for(name: str) -> str:
@@ -45,6 +50,7 @@ class FandomStore:
         # How each source has behaved across runs, keyed by URL. Read by the
         # health engine; a single run cannot tell a hiccup from a week of silence.
         self.health: dict[str, Any] = load_json(health_path(home), {"sources": {}}) or {}
+        self._odds: dict[str, Any] | None = None
 
     def save(self) -> None:
         save_json_atomic(teams_path(self.home),
@@ -64,6 +70,28 @@ class FandomStore:
 
     def save_health(self, health: dict[str, Any]) -> None:
         save_json_atomic(health_path(self.home), health)
+
+    @property
+    def odds(self) -> dict[str, Any]:
+        """The odds file, read on first ask.
+
+        Read back, unlike news.json, and for a reason of content rather than
+        symmetry: yesterday's headline served as today's is false, while
+        yesterday's line served with its timestamp is true -- and a cached
+        line is what answers when the credits run out.
+
+        Lazy, unlike sources.json, because this is the largest file under the
+        home and most commands never look at it. `teams list` has no idea what
+        a quote is and should not pay to load one.
+        """
+        if self._odds is None:
+            from fandom.engine import odds_store
+            self._odds = load_json(odds_path(self.home), odds_store.empty()) or odds_store.empty()
+        return self._odds
+
+    def save_odds(self, data: dict[str, Any]) -> None:
+        save_json_atomic(odds_path(self.home), data)
+        self._odds = data
 
     def seed_defaults(self) -> bool:
         """Install the BR seed once, into an empty store only."""
