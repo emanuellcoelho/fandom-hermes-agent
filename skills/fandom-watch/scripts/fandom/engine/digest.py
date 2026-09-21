@@ -11,7 +11,8 @@ from fandom.models import Team, NewsItem
 
 
 def build(teams: list[Team], items: list[NewsItem], failed_sources: list[str],
-          *, per_team_limit: int = 5, sources: dict[str, Any] | None = None) -> dict[str, Any]:
+          *, per_team_limit: int = 5, sources: dict[str, Any] | None = None,
+          odds: dict[str, Any] | None = None) -> dict[str, Any]:
     """Teams with their headlines, transfers flagged, failures named."""
     buckets = news_filter.filter_news(items, teams)
     followed: list[dict[str, Any]] = []
@@ -36,4 +37,8 @@ def build(teams: list[Team], items: list[NewsItem], failed_sources: list[str],
         # Built by the caller, which is what reads and writes the health file:
         # this stays pure.
         "sources": sources or {},
+        # Read from the odds cache by the caller, never fetched here. The
+        # morning message spends no credit: three leagues every day is ninety
+        # a month for a block most mornings have no game to fill.
+        "odds": odds or {},
     }

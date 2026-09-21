@@ -8,6 +8,9 @@ Commands:
     search_team <name>                          TheSportsDB candidates
     news [--limit N]                            fetch feeds, filter, cache
     matchday [key ...]                          fixtures and results
+    odds show [key ...]                         the board, folded into the cache
+    odds link <key> --sport-key K (--name N | --league)
+    odds sports [--sport S]                     what the board carries, free
     digest                                      the morning payload
     config get | config set KEY=VALUE ...
 
@@ -29,9 +32,13 @@ from kit import clock  # noqa: E402
 from fandom import config as fandom_config  # noqa: E402
 from fandom import store as store_module  # noqa: E402
 from fandom.engine import digest, matchday  # noqa: E402
+from fandom.engine import odds as odds_engine  # noqa: E402
+from fandom.engine import odds_match, odds_store  # noqa: E402
 from fandom.models import _SPORT_ALIASES, Sport, Team  # noqa: E402
 from fandom import sources as sources_module  # noqa: E402
+from fandom.sources import odds as odds_source  # noqa: E402
 from fandom.sources import thesportsdb  # noqa: E402
+from fandom.sources.base import SourceError, SourceOutcome  # noqa: E402
 from fandom.store import FandomStore  # noqa: E402
 
 HOME = os.environ.get("FANDOM_HOME", "/var/lib/hermes/fandom")
@@ -192,11 +199,179 @@ def cmd_digest(args: argparse.Namespace) -> int:
     settings = fandom_config.load(HOME)
     items, failed, outcomes = _sweep(teams, settings)
     health_block = _record_health(store, outcomes, teams, settings, announce=True)
+    odds_block = odds_store.upcoming(store.odds, teams, now=clock.now())
     payload = digest.build(teams, items, failed,
                            per_team_limit=int(settings["news_limit_per_team"]),
-                           sources=health_block)
+                           sources=health_block, odds=odds_block)
     payload["timezone"] = settings["timezone"]
     return emit(payload)
+
+
+# A fixture three days out is still "o próximo jogo" to someone asking. The
+# digest's horizon is shorter because it speaks unprompted.
+ODDS_SHOW_HORIZON_H = 72
+
+# Which board group stands behind each sport we follow. Esports is absent
+# because this board carries none, and that absence is the answer the linking
+# flow gives instead of an empty list with no explanation.
+ODDS_GROUPS = {
+    Sport.FUTEBOL: "Soccer",
+    Sport.BASQUETE: "Basketball",
+    Sport.FUTEBOL_AMERICANO: "American Football",
+}
+
+
+def _read_board(data, teams, sport_keys, *, at, method):
+    """Spend, fold, and report -- never raise.
+
+    A provider failure is a SourceOutcome like any other: the precedent is
+    `sources.read_source`, and a command that dies because a board was busy
+    is a command that tells a user nothing.
+    """
+    outcomes, spend = [], []
+    for sport_key in sport_keys:
+        estimate = odds_source.plan_cost()
+        try:
+            url = odds_source.safe_url(f"{odds_source.SPORTS_PATH}/{sport_key}/odds",
+                                       {"regions": odds_source.DEFAULT_REGIONS,
+                                        "markets": odds_source.DEFAULT_MARKETS})
+        except SourceError:
+            spend.append({"sport_key": sport_key, "reason": "unconfigured", "cost": 0})
+            continue
+        allowed, reason = odds_store.may_spend(data, estimate, now=clock.now())
+        if not allowed:
+            spend.append({"sport_key": sport_key, "reason": reason, "cost": 0})
+            continue
+        label = f"odds:{sport_key}"
+        try:
+            events, answer = odds_source.fetch_odds(sport_key)
+        except Exception as error:      # SourceError, OddsQuota, HttpError alike
+            outcomes.append(SourceOutcome(url=url, label=label, ok=False, error=str(error)))
+            spend.append({"sport_key": sport_key, "reason": "error", "cost": 0})
+            continue
+        # The header is the receipt; the estimate was only ever for the gate.
+        charged = answer.cost if answer.cost is not None else estimate
+        data = odds_store.charge(data, at=at, cost=charged, sport_key=sport_key,
+                                 remaining=answer.remaining)
+        snapshots = [
+            odds_engine.build_snapshot(event, at=at, method=method)
+            for event in events
+            if any(odds_match.owns(team, event.sport_key, event.home_team, event.away_team)
+                   for team in teams)
+        ]
+        data = odds_store.append(data, snapshots)
+        outcomes.append(SourceOutcome(url=url, label=label, ok=True))
+        spend.append({"sport_key": sport_key, "reason": "ok", "cost": charged,
+                      "events": len(snapshots)})
+    return data, outcomes, spend
+
+
+def cmd_odds(args: argparse.Namespace) -> int:
+    """The board for the followed set, folded into the cache and served with its age.
+
+    Exit 0 even when nothing could be read: a spent quota is not a broken
+    command, and the cached line with `age_minutes` on it is still an answer.
+    """
+    store = FandomStore(HOME)
+    store.seed_defaults()
+    try:
+        teams = [store.get(key) for key in args.keys] if args.keys else store.all()
+    except KeyError as error:
+        return fail(str(error))
+    settings = fandom_config.load(HOME)
+    now = clock.now()
+    stamp = clock.iso(now)
+    data = store.odds
+    # A machine word, not a sentence: the SKILL.md decides how to say "esse
+    # assunto ainda nao tem quadro".
+    unlinked = [{"key": team.key, "reason": "unlinked"}
+                for team in teams if not team.odds_sport]
+    wanted = sorted({team.odds_sport for team in teams if team.odds_sport})
+    outcomes, spend = [], []
+    if wanted and not args.no_spend:
+        data, outcomes, spend = _read_board(data, teams, wanted, at=stamp, method=args.method)
+    data = odds_store.prune(data, now=now)
+    store.save_odds(data)
+    block = odds_store.upcoming(data, teams, now=now, horizon_h=ODDS_SHOW_HORIZON_H,
+                                include_stale=True)
+    payload = {
+        "at": stamp,
+        "method": args.method,
+        "events": block["events"],
+        "unlinked": unlinked,
+        "spend": spend,
+        "budget": odds_store.spent(data, now=now),
+    }
+    if outcomes:
+        payload["sources"] = _record_health(store, outcomes, teams, settings)
+    return emit(payload)
+
+
+def cmd_odds_link(args: argparse.Namespace) -> int:
+    """Name the board entry for a subject. Costs nothing in any of its modes.
+
+    Without --sport-key it lists the competitions this subject could belong
+    to; with one it ranks the board's spellings; with --name or --league it
+    commits. Nothing is ever matched by resemblance at read time, so this
+    conversation is the only place a link is made.
+    """
+    store = FandomStore(HOME)
+    store.seed_defaults()
+    try:
+        team = store.get(args.key)
+    except KeyError as error:
+        return fail(str(error))
+
+    if not args.sport_key:
+        group = ODDS_GROUPS.get(team.sport)
+        if group is None:
+            return emit({"team": team.key, "sports": [], "reason": "sport_not_covered"})
+        try:
+            sports, _answer = odds_source.list_sports()
+        except Exception as error:
+            return fail(f"odds: {error}")
+        return emit({"team": team.key, "reason": "ok", "cost": 0,
+                     "sports": [sport for sport in sports
+                                if sport.get("group") == group and sport.get("active")]})
+
+    try:
+        events, _answer = odds_source.list_events(args.sport_key)
+    except Exception as error:
+        return fail(f"odds: {error}")
+
+    if args.league:
+        team.odds_sport, team.odds_key = args.sport_key, None
+        store.save()
+        return emit({"linked": store.compact_view(team), "scope": "league",
+                     "sport_key": args.sport_key, "fixtures": len(events)})
+
+    if args.name:
+        spelled = {event.home_team for event in events} | {event.away_team for event in events}
+        if args.name not in spelled:
+            # Exact, deliberately: a near match here is the wrong club, and the
+            # candidate list exists so nobody has to type from memory.
+            return fail(f"no team spelled {args.name!r} on {args.sport_key}")
+        team.odds_sport, team.odds_key = args.sport_key, args.name
+        store.save()
+        return emit({"linked": store.compact_view(team), "scope": "team",
+                     "sport_key": args.sport_key, "name": args.name})
+
+    from dataclasses import replace
+    probe = replace(team, odds_sport=args.sport_key)
+    return emit({"team": team.key, "sport_key": args.sport_key, "cost": 0,
+                 "candidates": odds_match.candidates(events, probe),
+                 "fixtures": len(events)})
+
+
+def cmd_odds_sports(args: argparse.Namespace) -> int:
+    """What the board carries, in season or not. Free."""
+    try:
+        sports, _answer = odds_source.list_sports()
+    except Exception as error:
+        return fail(f"odds: {error}")
+    if args.group:
+        sports = [sport for sport in sports if sport.get("group") == args.group]
+    return emit({"sports": sports, "cost": 0})
 
 
 def cmd_config(args: argparse.Namespace) -> int:
@@ -246,6 +421,27 @@ def main() -> int:
     it.set_defaults(run=cmd_matchday)
 
     verbs.add_parser("live").set_defaults(run=cmd_live)
+
+    # `odds` takes subverbs rather than a bare key list: a positional nargs="*"
+    # next to subparsers is ambiguous to argparse, and the gymnastics to make
+    # it work would cost more than the two extra characters of "show".
+    it = verbs.add_parser("odds")
+    sub = it.add_subparsers(dest="action", required=True)
+    show = sub.add_parser("show")
+    show.add_argument("keys", nargs="*")
+    show.add_argument("--method", choices=list(odds_engine.METHODS),
+                      default=odds_engine.DEFAULT_METHOD)
+    show.add_argument("--no-spend", action="store_true")
+    show.set_defaults(run=cmd_odds)
+    link = sub.add_parser("link")
+    link.add_argument("key")
+    link.add_argument("--sport-key", default=None)
+    link.add_argument("--name", default=None)
+    link.add_argument("--league", action="store_true")
+    link.set_defaults(run=cmd_odds_link)
+    sports = sub.add_parser("sports")
+    sports.add_argument("--group", default=None)
+    sports.set_defaults(run=cmd_odds_sports)
 
     verbs.add_parser("digest").set_defaults(run=cmd_digest)
 

@@ -199,13 +199,18 @@ def as_row(snapshot: OddsSnapshot, *, now: datetime,
 
 def upcoming(data: dict[str, Any], teams: list[Team], *, now: datetime,
              horizon_h: int = DIGEST_HORIZON_H,
-             max_age_min: int = DIGEST_MAX_AGE_MIN) -> dict[str, Any]:
-    """The cached lines worth a sentence this morning. Spends nothing.
+             max_age_min: int = DIGEST_MAX_AGE_MIN,
+             include_stale: bool = False) -> dict[str, Any]:
+    """The cached lines for the followed set. Spends nothing.
 
     Three leagues read every day at 08:30 is ninety credits a month for a
     block most mornings have no game to fill, so the digest reads what the
-    matchday runs already paid for. A line older than the window is left out
-    entirely: better silent than quoting the day before yesterday.
+    matchday runs already paid for.
+
+    `include_stale` is the difference between being asked and volunteering.
+    Someone who asked for the odds is owed the old reading with its age on it;
+    the morning message, which nobody asked for, stays quiet rather than
+    opening with the day before yesterday.
     """
     horizon = now + timedelta(hours=horizon_h)
     rows: list[dict[str, Any]] = []
@@ -222,7 +227,7 @@ def upcoming(data: dict[str, Any], teams: list[Team], *, now: datetime,
         if owner is None:
             continue
         row = as_row(snapshot, now=now, stale_after_min=max_age_min)
-        if row["stale"]:
+        if row["stale"] and not include_stale:
             continue
         row["team"] = owner.key
         rows.append(row)

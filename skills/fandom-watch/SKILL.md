@@ -87,6 +87,85 @@ comes only from `matchday`. Then offer to turn on the team's placar em
 tempo real (live scores) — in those words, never "provedor" — which is
 what unlocks real scores.
 
+## Cotação — o mercado como descrição, nunca como conselho
+
+    fandom.py odds show                    # every linked subject
+    fandom.py odds show flamengo           # one of them
+    fandom.py odds show flamengo --no-spend    # cache only, costs nothing
+
+**Only when asked.** Never open a resumo, a matchday reply or a follow
+confirmation with a cotação. The number answers a question; it never starts a
+conversation.
+
+### Linking first — nothing is matched by resemblance
+
+An unlinked subject answers `{"key": "...", "reason": "unlinked"}` and no
+number. That is by design: the board prints "Internacional" and also "Inter
+Miami CF", and attaching a probability to the wrong club is the one error
+this agent may not make. The link is a short conversation:
+
+    fandom.py odds link flamengo                                   # which competitions
+    fandom.py odds link flamengo --sport-key soccer_brazil_campeonato   # ranked spellings
+    fandom.py odds link flamengo --sport-key soccer_brazil_campeonato --name "Flamengo"
+    fandom.py odds link brasileirao --sport-key soccer_brazil_campeonato --league
+
+All three modes are free. Ask with the opponent, never with the key —
+"o Internacional que pega o Grêmio no domingo?" — because `next_against` is
+in every candidate and `sport_key` means nothing to a person. `--league`
+follows the whole competition; `--name` follows one club and must be the
+board's exact spelling, which is why you pick it from `candidates` instead
+of typing it.
+
+### Saying the number
+
+Every event carries `outcomes[].p` (the probability with the house's margin
+removed), `price` (what the board posts), `confidence`, `books`, `age_minutes`
+and `stale`.
+
+    📊 *Flamengo x Palmeiras* — domingo, 19h
+    O mercado dá *51%* pro Mengão, 26% empate, 23% pro Palmeiras.
+    7 casas, lidas há 12 minutos.
+
+Rules that are not style:
+
+- **Age, always.** Say "há 12 minutos", "de ontem à noite". `stale: true`
+  means say it or say nothing — never serve an old number bare.
+- **`p`, not the raw division.** The payload already removed the margin;
+  `overround` is how big the cut was, and it is *not* anyone's chance.
+- **`price` is a quote, `fair_price` is not.** `fair_price` is the same bet
+  without the house's cut — a number no shop offers. If you say it, say that.
+- **`confidence`**: `firm` = the books agree, say the number plainly. `split`
+  = "as casas discordam, entre 46% e 58%" — say the range instead. `thin` =
+  fewer than three books, "pouca casa cotando, dá pra ficar de olho mas não
+  vale número redondo".
+- **`books_dropped`** is only worth mentioning when it is most of them.
+- Nenhuma casa é destino. Cite "7 casas" como origem do número; nunca
+  "na Bet X está 1.95", nunca um link, nunca onde apostar.
+- Nunca palpite, valor, entrada, banca, unidade. A frase é sobre o mercado,
+  não sobre a noite de ninguém.
+
+### When there is no number — the tokens and what they mean
+
+| token | what happened | say |
+| --- | --- | --- |
+| `unlinked` | nobody confirmed which board entry this is | offer the link conversation |
+| `sport_not_covered` | this board carries no such sport | say it once, and drop it |
+| `quota` / `monthly_reserve` | the credits for the window are gone | "o quadro de cotação fechou por hoje", then serve the cached line with its age |
+| `daily_budget` | today's reads are spent | same, and the cache still answers |
+| `unconfigured` | no board is wired to this agent | not the user's problem — say cotação is not turned on here |
+| `error` | the board failed | it is in `sources` like any dead feed: ⚠️ once, never every morning |
+
+**E-sports has no board.** CBLOL and CS2 answer `sport_not_covered`, and that
+is a fact about the market, not a bug. Say it once, in one line, and never
+bring it up again.
+
+### The digest carries the block and does not print it
+
+`fandom.py digest` includes an `odds` block, read from the cache, costing
+nothing. The morning message still says nothing about cotação. It is there so
+that a "e a cotação do jogo?" right after the resumo is answered from what is
+already in hand instead of a new call.
+
 ## Reply formats
 
 Follow confirmed:
