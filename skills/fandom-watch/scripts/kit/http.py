@@ -43,8 +43,26 @@ def _retry_after_s(error: urllib.error.HTTPError) -> float | None:
     return float(raw)
 
 
-def fetch(url: str, *, timeout_s: float = 8.0, attempts: int = 2) -> tuple[int, bytes]:
-    """GET the URL, return (status, body). Retries transient failures once.
+def _named(headers) -> dict[str, str]:
+    """Response headers as a plain dict, lowercased.
+
+    HTTP header case carries no meaning, so a caller that has to choose
+    between `X-Requests-Remaining` and `x-requests-remaining` will choose
+    wrong once and read `None` for a number that was there all along.
+    """
+    if headers is None:
+        return {}
+    return {str(name).lower(): str(value) for name, value in headers.items()}
+
+
+def fetch_headers(url: str, *, timeout_s: float = 8.0,
+                  attempts: int = 2) -> tuple[int, dict[str, str], bytes]:
+    """GET the URL, return (status, headers, body). Retries transient failures once.
+
+    The headers come back from the error path too, and that is the point: a
+    quota lives in a response header, and the request that discovers the quota
+    is spent is precisely the one that answers 429. Throwing the headers away
+    there means the only way to learn the credits were gone was to spend one.
 
     Any single request's failure is the caller's to survive -- a sweep checks
     many items and one bad store must never end the sweep.
@@ -54,7 +72,7 @@ def fetch(url: str, *, timeout_s: float = 8.0, attempts: int = 2) -> tuple[int, 
         try:
             request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7"})
             with urllib.request.urlopen(request, timeout=timeout_s) as response:
-                return response.status, response.read()
+                return response.status, _named(getattr(response, "headers", None)), response.read()
         except urllib.error.HTTPError as error:
             if error.code in (429, 500, 502, 503, 504) and attempt < attempts - 1:
                 last_error = error
@@ -63,7 +81,13 @@ def fetch(url: str, *, timeout_s: float = 8.0, attempts: int = 2) -> tuple[int, 
                     wait = _BACKOFF_BASE_S * (2 ** attempt)
                 _sleep(min(wait, _RETRY_AFTER_CAP_S))
                 continue
-            return error.code, error.read()
+            return error.code, _named(getattr(error, "headers", None)), error.read()
         except OSError as error:
             last_error = error
     raise HttpError(f"GET {url} failed: {last_error}")
+
+
+def fetch(url: str, *, timeout_s: float = 8.0, attempts: int = 2) -> tuple[int, bytes]:
+    """GET the URL, return (status, body). What most callers want."""
+    status, _headers, body = fetch_headers(url, timeout_s=timeout_s, attempts=attempts)
+    return status, body

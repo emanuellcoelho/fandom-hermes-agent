@@ -28,9 +28,10 @@ ONE_ITEM = (b'<?xml version="1.0"?><rss version="2.0"><channel>'
 class _Response:
     """What urlopen hands back: a context manager with .status and .read()."""
 
-    def __init__(self, status: int, body: bytes):
+    def __init__(self, status: int, body: bytes, headers: dict | None = None):
         self.status = status
         self._body = body
+        self.headers = headers or {}
 
     def read(self) -> bytes:
         return self._body
@@ -217,3 +218,49 @@ class TestAgainstALocalServer:
     def test_timeout_raises_http_error(self, server):
         with pytest.raises(http.HttpError):
             http.fetch(f"{server}/slow", timeout_s=0.2, attempts=1)
+
+
+class TestResponseHeaders:
+    """fetch_headers, which exists so a quota can be read where it is written."""
+
+    def _spy(self, monkeypatch, outcomes):
+        seen = []
+
+        def fake(request, timeout=None):
+            seen.append(request)
+            outcome = outcomes[len(seen) - 1]
+            if isinstance(outcome, Exception):
+                if isinstance(outcome, urllib.error.HTTPError):
+                    outcome.read = lambda: b"error body"
+                raise outcome
+            return outcome
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake)
+        return seen
+
+    def test_headers_come_back_lowercased(self, monkeypatch):
+        self._spy(monkeypatch, [_Response(200, ONE_ITEM, {"X-Requests-Remaining": "451"})])
+        status, headers, body = http.fetch_headers("https://example.test/odds")
+        assert status == 200 and body == ONE_ITEM
+        assert headers["x-requests-remaining"] == "451"
+
+    def test_the_error_path_carries_them_too(self, monkeypatch):
+        """The whole reason this function exists: a 429 is where remaining is 0."""
+        error = _http_error(429, headers={"x-requests-remaining": "0"})
+        self._spy(monkeypatch, [error, error])
+        status, headers, _body = http.fetch_headers("https://example.test/odds")
+        assert status == 429
+        assert headers["x-requests-remaining"] == "0"
+
+    def test_a_response_without_headers_is_an_empty_dict_not_a_crash(self, monkeypatch):
+        """urlopen stubs in this suite predate headers; none of them may break."""
+        response = _Response(200, ONE_ITEM)
+        del response.headers
+        self._spy(monkeypatch, [response])
+        _status, headers, _body = http.fetch_headers("https://example.test/feed")
+        assert headers == {}
+
+    def test_fetch_still_answers_two_values(self, monkeypatch):
+        """Every existing caller unpacks a pair; the wrapper keeps that true."""
+        self._spy(monkeypatch, [_Response(200, ONE_ITEM, {"Server": "nginx"})])
+        assert http.fetch("https://example.test/feed") == (200, ONE_ITEM)
