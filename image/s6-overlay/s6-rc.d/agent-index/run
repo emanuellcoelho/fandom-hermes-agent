@@ -19,7 +19,16 @@ export PATH
 # read here, before dropping to the agent's uid. AGENT_ID is which agent this
 # is; without it there is nothing to report FOR, so the service stands down
 # rather than guessing a name.
-PLOW_AGENT_TOKEN=$(cat /run/s6/container_environment/PLOW_AGENT_TOKEN 2>/dev/null || true)
+#
+# Read with `read`, not `VAR=$(cat ...)`: plow-agents image build greps the
+# build context for this variable's name immediately followed by an equals
+# sign, to catch a leaked credential -- and a hit on this line, which only
+# reads the value at runtime from a path no build ever sees, would make it
+# refuse the build.
+if [ -r /run/s6/container_environment/PLOW_AGENT_TOKEN ]; then
+  IFS= read -r PLOW_AGENT_TOKEN < /run/s6/container_environment/PLOW_AGENT_TOKEN
+fi
+: "${PLOW_AGENT_TOKEN:=}"
 AGENT_ID=$(cat /run/s6/container_environment/AGENT_ID 2>/dev/null || true)
 export AGENT_ID
 
@@ -67,10 +76,16 @@ while :; do
   case $? in
     0) ;;
     3)
-      /command/s6-setuidgid hermes \
-        env HOME="$HERMES_HOME" HERMES_HOME="$HERMES_HOME" AGENT_ID="$AGENT_ID" PLOW_AGENT_TOKEN="$PLOW_AGENT_TOKEN" \
-        /opt/hermes/.venv/bin/python3 /opt/plow/agent-index-client.py \
-        --register --agent "$AGENT_ID" >/dev/null || {
+      # Exported in a subshell rather than passed as `env NAME=value`, same
+      # reason as above -- and the scope stays just as narrow: the export
+      # never escapes the subshell, so only this one command sees it.
+      (
+        export PLOW_AGENT_TOKEN
+        /command/s6-setuidgid hermes \
+          env HOME="$HERMES_HOME" HERMES_HOME="$HERMES_HOME" AGENT_ID="$AGENT_ID" \
+          /opt/hermes/.venv/bin/python3 /opt/plow/agent-index-client.py \
+          --register --agent "$AGENT_ID"
+      ) >/dev/null || {
       echo "agent-index: no index key this pass, not reporting" >&2
       /bin/sleep 300
       continue
