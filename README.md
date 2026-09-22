@@ -1,13 +1,13 @@
 # Fandom
 
 > **Seu time, seu noticiário: futebol, NBA, NFL e e-sports.**
-> **Your teams, your news — scores and the morning digest.**
+> **Your teams, your news — scores and the digest, three times a day.**
 
 A sports-fandom [Plow](https://plow.co) agent, Brazilian first. Text it a
 team, a league or an esports scene and it follows the headlines for you:
 matches, signings, market moves, championships — futebol 🇧🇷, NBA 🏀, NFL 🏈,
-CBLOL/CS2/Valorant 🎮. Morning digest, matchday alerts, honest about what it
-could not confirm.
+CBLOL/CS2/Valorant 🎮. Digest three times a day (manhã, tarde, noite) by
+default, matchday alerts, honest about what it could not confirm.
 
 A Hermes agent built on the
 [`plow-hermes-agent`](https://github.com/plow-pbc/plow-hermes-agent) base
@@ -20,9 +20,10 @@ image for the AI Worth Using Hackathon, September 2026. Sibling of
 - **Follow by name** — "me acompanha no Corinthians" creates the follow with
   nicknames ("Timão") that match headlines; leagues and esports scenes
   follow the same way ("Brasileirão", "CBLOL").
-- **Morning digest** — news grouped by followed subject from live feeds
-  (ge.globo, ESPN, BBC), one line each with link; transfers marked as
-  *Mercado:* rumor, never as fact.
+- **Digest, three times a day** — news grouped by followed subject from live
+  feeds (ge.globo, ESPN, BBC), one line each with link; transfers marked as
+  *Mercado:* rumor, never as fact. Fires manhã/tarde/noite (08:00/12:00/18:00)
+  by default, configurable during onboarding.
 - **Matchday** — next fixture, live score and last result when the provider
   has them; when it does not, the agent says "placar não confirmado" instead
   of guessing.
@@ -73,11 +74,11 @@ skills/fandom-watch/scripts/
     ├── sources/        # RSS (ge, ESPN, BBC), TheSportsDB; dead feed = ⚠️
     └── engine/
         ├── news_filter.py  # pure: aliases, accents, market topics, dedup
-        ├── digest.py       # the morning payload
+        ├── digest.py       # the roundup payload (fires 3x/day by default)
         └── matchday.py     # fixtures, live, results — honest by design
 
 skills/fandom-watch/SKILL.md      # the voice: follows, news, matchday
-skills/fandom-news/SKILL.md       # the morning read
+skills/fandom-news/SKILL.md       # the day's reads (manhã, tarde, noite)
 skills/fandom-onboarding/SKILL.md # first contact, after the first value
 ```
 
@@ -90,7 +91,7 @@ Schedules, registered by the agent itself during onboarding:
 
 | name | schedule (container TZ) | delivery |
 | --- | --- | --- |
-| `fandom-digest` | `30 8 * * *` (yours to choose) | cron `--deliver` to your chat |
+| `fandom-digest` | `0 8,12,18 * * *` (yours to choose) | cron `--deliver` to your chat |
 | `fandom-matchday` | `0 12,19 * * *` | one message only when there is a game or result |
 
 ## Privacy

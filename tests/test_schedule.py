@@ -16,18 +16,19 @@ JANUARY = datetime(2026, 1, 15, 12, 0, tzinfo=SP)
 
 
 def settings(**kwargs):
-    base = {"timezone": "America/Sao_Paulo", "digest_time": "08:30",
+    base = {"timezone": "America/Sao_Paulo", "digest_times": ["08:00", "12:00", "18:00"],
             "digest_enabled": True, "matchday_times": ["12:00", "19:00"]}
     return {**base, **kwargs}
 
 
 class TestConversion:
     def test_a_utc_container_gets_the_sao_paulo_hour_restated(self):
-        """08:30 in Sao Paulo is 11:30 UTC, and a job at 11:30 in a UTC
-        container lands at 08:30 for the reader -- the same instant."""
+        """08:00/12:00/18:00 in Sao Paulo is 11:00/15:00/21:00 UTC, and a job
+        at those hours in a UTC container lands at the reader's local hours --
+        the same instants."""
         plan = schedule.plan(settings(), container_tz="UTC", now=JUNE)
-        assert plan["digest"]["cron"] == "30 11 * * *"
-        assert plan["digest"]["fires"] == ["11:30"]
+        assert plan["digest"]["cron"] == "0 11,15,21 * * *"
+        assert plan["digest"]["fires"] == ["11:00", "15:00", "21:00"]
         assert plan["matchday"]["cron"] == "0 15,22 * * *"
         assert plan["aligned"] is False
 
@@ -35,18 +36,18 @@ class TestConversion:
         """The ideal case, and the one a restart produces: no arithmetic at all."""
         plan = schedule.plan(settings(), container_tz="America/Sao_Paulo", now=JUNE)
         assert plan["aligned"] is True
-        assert plan["digest"]["cron"] == "30 8 * * *"
+        assert plan["digest"]["cron"] == "0 8,12,18 * * *"
         assert plan["matchday"]["cron"] == "0 12,19 * * *"
 
     def test_a_late_hour_wraps_past_midnight_without_a_special_case(self):
         """22:00 in Sao Paulo is 01:00 UTC the next day, and a daily job is
         `* * *`, so the wrap marks the same instant."""
-        plan = schedule.plan(settings(digest_time="22:00"), container_tz="UTC", now=JUNE)
+        plan = schedule.plan(settings(digest_times=["22:00"]), container_tz="UTC", now=JUNE)
         assert plan["digest"]["cron"] == "0 1 * * *"
 
     def test_a_missing_container_zone_is_utc_explicitly(self):
         plan = schedule.plan(settings(), container_tz=None, now=JUNE)
-        assert plan["container_tz"] == "UTC" and plan["digest"]["cron"] == "30 11 * * *"
+        assert plan["container_tz"] == "UTC" and plan["digest"]["cron"] == "0 11,15,21 * * *"
 
     def test_a_zone_nothing_can_resolve_falls_back_and_says_so(self):
         """Never a crash over a value the agent itself wrote, and never a
@@ -56,7 +57,7 @@ class TestConversion:
         assert plan["timezone"] == "UTC" and plan["aligned"] is True
 
     def test_a_malformed_time_is_dropped_not_guessed(self):
-        plan = schedule.plan(settings(digest_time="quando der"), container_tz="UTC", now=JUNE)
+        plan = schedule.plan(settings(digest_times=["quando der"]), container_tz="UTC", now=JUNE)
         assert plan["digest"]["cron"] == "" and plan["digest"]["fires"] == []
 
 
@@ -73,13 +74,13 @@ class TestDrift:
         plan = schedule.plan(london, container_tz="UTC",
                              now=datetime(2026, 6, 15, 12, tzinfo=ZoneInfo("Europe/London")))
         assert plan["drifts_after_dst"] is True
-        assert plan["digest"]["cron"] == "30 7 * * *"      # BST in June
+        assert plan["digest"]["cron"] == "0 7,11,17 * * *"      # BST in June
 
     def test_the_same_dst_zone_converts_differently_in_winter(self):
         london = settings(timezone="Europe/London")
         plan = schedule.plan(london, container_tz="UTC",
                              now=datetime(2026, 1, 15, 12, tzinfo=ZoneInfo("Europe/London")))
-        assert plan["digest"]["cron"] == "30 8 * * *"      # GMT in January
+        assert plan["digest"]["cron"] == "0 8,12,18 * * *"      # GMT in January
 
     def test_an_aligned_dst_zone_is_not_flagged(self):
         """Alignment is the cure: the container follows the transition too."""

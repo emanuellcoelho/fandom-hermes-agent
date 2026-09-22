@@ -7,11 +7,11 @@ from typing import Any
 
 from kit.jsonio import load_json, save_json_atomic
 
-REQUIRED_KEYS = ("timezone", "digest_time", "language")
+REQUIRED_KEYS = ("timezone", "digest_times", "language")
 
 DEFAULTS: dict[str, Any] = {
     "timezone": "UTC",
-    "digest_time": "08:30",
+    "digest_times": ["08:00", "12:00", "18:00"],
     "digest_enabled": True,
     "language": "",                   # "" = mirror the user each turn
     "news_limit_per_team": 5,

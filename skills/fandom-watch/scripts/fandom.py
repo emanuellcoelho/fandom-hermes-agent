@@ -11,7 +11,7 @@ Commands:
     odds show [key ...]                         the board, folded into the cache
     odds link <key> --sport-key K (--name N | --league)
     odds sports [--sport S]                     what the board carries, free
-    digest                                      the morning payload
+    digest                                      the roundup payload (fires 3x/day by default)
     schedule                                    the cron specs to register
     config get | config set KEY=VALUE ...
 
@@ -194,7 +194,8 @@ def cmd_live(args: argparse.Namespace) -> int:
 
 
 def cmd_digest(args: argparse.Namespace) -> int:
-    """Fetch + filter + build in one command -- what the digest cron runs."""
+    """Fetch + filter + build in one command -- what the digest cron runs,
+    by default three times a day (manhã, tarde, noite)."""
     store = FandomStore(HOME)
     store.seed_defaults()
     teams = store.all()
@@ -399,6 +400,8 @@ def cmd_config(args: argparse.Namespace) -> int:
             return fail(f"unknown config key {key!r}")
         if key == "digest_enabled":
             current[key] = raw.strip().lower() in ("1", "true", "yes", "on")
+        elif key == "digest_times":
+            current[key] = [part.strip() for part in raw.split(",") if part.strip()]
         else:
             current[key] = raw.strip()
     fandom_config.save(HOME, current)

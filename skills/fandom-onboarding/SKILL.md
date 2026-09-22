@@ -18,11 +18,16 @@ Finished means `fandom.py teams list` answers `onboarding_missing: []`.
    reply (`config set language=pt-BR`).
 2. **Timezone** — needed so the digest lands at the right local hour. A city
    name becomes its IANA zone. Save it.
-3. **Digest time** — offer the default, in their language: "resumo todo dia
-   às 08:30, bom?" / "a roundup every morning at 08:30, good?"
-   Save as `digest_time=HH:MM`, `digest_enabled=false` if they decline.
-   (In your own words to the user it is the "resumo da manhã" / "morning
-   roundup"; `digest` is the command's name, never theirs.)
+3. **Digest times** — offer the default, in their language: "resumo 3x por
+   dia — manhã (08:00), tarde (12:00) e noite (18:00), bom?" / "a roundup
+   three times a day — morning (08:00), afternoon (12:00) and evening
+   (18:00), good?" If they want fewer or different times, take them as a
+   list. Save as `digest_times=HH:MM,HH:MM,HH:MM` (comma-separated, in the
+   order they fire), `digest_enabled=false` if they decline entirely.
+   (In your own words to the user each one is the "resumo da manhã" / "da
+   tarde" / "da noite" — "morning/afternoon/evening roundup" — picked from
+   the local hour it actually fires at; `digest` is the command's name,
+   never theirs.)
 4. **What else to follow** — ask what they actually root for, one at a time,
    and add each with its aliases. `teams remove <key>` for what they do not
    want.
@@ -51,7 +56,7 @@ Finished means `fandom.py teams list` answers `onboarding_missing: []`.
    CS2). It is a starting point, not a preference: **if their language is
    not pt-BR, do not present it** — clear what they do not recognise with
    `teams remove` as soon as they tell you what they follow, rather than
-   leaving a Brazilian league in the morning digest of someone in Chicago.
+   leaving a Brazilian league in the digest of someone in Chicago.
 
 ## Registering the schedules (as soon as the config is complete)
 
@@ -59,8 +64,8 @@ Finished means `fandom.py teams list` answers `onboarding_missing: []`.
 config the user had not filled in yet — so after onboarding it is almost
 always UTC while the user lives somewhere else. The old instruction here was
 to wait for a restart that realigns them. Nobody restarts a cloud agent: this
-agent ran five days in production with no schedule at all, and the morning
-roundup is the whole product.
+agent ran five days in production with no schedule at all, and the roundup
+is the whole product.
 
 Ask the engine for the specs instead of doing the arithmetic yourself:
 
@@ -68,22 +73,33 @@ Ask the engine for the specs instead of doing the arithmetic yourself:
 
     {"timezone": "America/Sao_Paulo", "container_tz": "UTC", "aligned": false,
      "drifts_after_dst": false,
-     "digest":   {"name": "fandom-digest",   "local": ["08:30"], "fires": ["11:30"],
-                  "cron": "30 11 * * *", "enabled": true},
+     "digest":   {"name": "fandom-digest",   "local": ["08:00","12:00","18:00"],
+                  "fires": ["11:00","15:00","21:00"],
+                  "cron": "0 11,15,21 * * *", "enabled": true},
      "matchday": {"name": "fandom-matchday", "local": ["12:00","19:00"],
                   "fires": ["15:00","22:00"], "cron": "0 15,22 * * *"}}
 
-`cron` is the field to register, always — it is the user's local hour restated
-in the zone the job will actually fire in. `local` is what you say to them
-("o resumo cai às 08:30"); `fires` is the same instant in the container's zone
-and is never spoken aloud. An empty `cron` means the time could not be parsed:
-ask again rather than registering a guess.
+`cron` is the field to register, always — it is the user's local hours restated
+in the zone the job will actually fire in, folded into one daily spec when they
+share a minute (the default 08:00/12:00/18:00 always does). `local` is what
+you say to them ("o resumo da manhã cai às 08:00, o da tarde às 12:00, o da
+noite às 18:00"); `fires` is the same instants in the container's zone and is
+never spoken aloud.
+
+An empty `cron` has two different causes, and they call for different repairs:
+a time that could not be parsed at all (ask again rather than registering a
+guess), or digest times that do not share a minute (e.g. 08:15 and 12:00) --
+`cron_of` refuses to round anyone's schedule for tidiness. In the second case
+`fires` is still populated: register one `fandom-digest` job per moment
+instead of one job for all of them, naming each `fandom-digest-1`,
+`fandom-digest-2`, … in firing order, all pointing at the same prompt and
+skill.
 
 Registered once, by you, from a turn (a turn carries the gateway's
 environment; a bare exec does not):
 
     /opt/hermes/bin/hermes cron create "<digest.cron>" \
-      "Run the fandom digest now: execute fandom.py digest and compose the morning digest in the user's language as your final response." \
+      "Run the fandom digest now: execute fandom.py digest and compose the roundup in the user's language as your final response, calling it resumo da manhã/da tarde/da noite (or morning/afternoon/evening roundup) by the local hour it is actually firing at." \
       --name fandom-digest --skill fandom-news \
       --model anthropic/claude-sonnet-5 --provider plow \
       --deliver "plow_chat:${PLOW_HOME_CHANNEL}"
@@ -120,7 +136,7 @@ does not follow a zone it was never told about. Two things follow:
   after any offset change. When `aligned` is true the conversion disappears and
   the drift cannot happen at all — a restart is the cure, not a prerequisite.
 
-After any change to `timezone` or `digest_time`, re-run `fandom.py schedule`,
+After any change to `timezone` or `digest_times`, re-run `fandom.py schedule`,
 remove the old job (`hermes cron remove fandom-digest`) and create it again.
 If a job already exists and its spec still matches, leave it — never duplicate
 a schedule.

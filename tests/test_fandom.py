@@ -76,8 +76,8 @@ class TestStore:
 
 class TestConfig:
     def test_missing_keys_on_raw_file(self, tmp_path):
-        assert set(missing_keys(str(tmp_path))) == {"timezone", "digest_time", "language"}
-        assert DEFAULTS["digest_time"] == "08:30"
+        assert set(missing_keys(str(tmp_path))) == {"timezone", "digest_times", "language"}
+        assert DEFAULTS["digest_times"] == ["08:00", "12:00", "18:00"]
 
 
 class TestTheSportsDB:

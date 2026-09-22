@@ -112,7 +112,7 @@ def plan(settings: dict[str, Any], *, container_tz: str | None,
         user_zone = container_zone
     aligned = str(getattr(user_zone, "key", "")) == str(getattr(container_zone, "key", ""))
 
-    digest_times = [str(settings.get("digest_time") or "08:30")]
+    digest_times = [str(item) for item in (settings.get("digest_times") or [])]
     matchday_times = [str(item) for item in (settings.get("matchday_times") or [])]
 
     def spec(times: list[str]) -> dict[str, Any]:

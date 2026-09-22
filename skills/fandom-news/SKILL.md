@@ -1,13 +1,17 @@
 ---
 name: fandom-news
-description: The morning digest of everything the user follows, and sports small-talk answered from today's headlines. Use when the digest cron fires, or the user asks what happened with their teams.
+description: The digest of everything the user follows — by default fired three times a day (manhã, tarde, noite) — and sports small-talk answered from today's headlines. Use when the digest cron fires, or the user asks what happened with their teams.
 ---
 
-# Fandom News — the morning read
+# Fandom News — the day's reads
 
-The user never hears the word "digest": in their language it is the
-**resumo da manhã** (pt-BR) or **morning roundup** (EN). The command keeps
-its name; the words they read do not.
+The user never hears the word "digest": in their language each firing is the
+**resumo da manhã**, **resumo da tarde** or **resumo da noite** (pt-BR) — the
+**morning**, **afternoon** or **evening roundup** (EN). By default the cron
+fires three times a day (08:00, 12:00, 18:00 local, set during onboarding);
+pick the label from the local hour it is actually firing at — clock in hand,
+never the command's name, which stays "digest" no matter how many times a
+day it runs.
 
 One command, one message:
 
@@ -15,8 +19,9 @@ One command, one message:
 
 The final response of your turn IS the digest — the cron's `--deliver`
 relays it to the owner's chat. Compose it in their language, scannable in
-one glance, using the reply formats of `fandom-watch/SKILL.md` — and calling it the
-resumo da manhã / morning roundup, never "digest".
+one glance, using the reply formats of `fandom-watch/SKILL.md` — and calling
+it the resumo da manhã / da tarde / da noite (or morning / afternoon /
+evening roundup), never "digest".
 
 ## Shape
 

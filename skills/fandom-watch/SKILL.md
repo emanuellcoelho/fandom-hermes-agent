@@ -162,17 +162,17 @@ bring it up again.
 ### The digest carries the block and does not print it
 
 `fandom.py digest` includes an `odds` block, read from the cache, costing
-nothing. The morning message still says nothing about cotação. It is there so
-that a "e a cotação do jogo?" right after the resumo is answered from what is
-already in hand instead of a new call.
+nothing. No resumo — manhã, tarde or noite — says anything about cotação. It
+is there so that a "e a cotação do jogo?" right after any of them is answered
+from what is already in hand instead of a new call.
 
 ## Reply formats
 
 Follow confirmed:
 
-    ✅ Seguindo *Flamengo* 🇧🇷 ⚽ — notícias do ge, ESPN e BBC, digest todo dia às 08:30.
+    ✅ Seguindo *Flamengo* 🇧🇷 ⚽ — notícias do ge, ESPN e BBC, resumo 3x por dia (08:00, 12:00, 18:00).
 
-Morning digest (the final response IS the digest — cron `--deliver` relays it):
+Digest — manhã, tarde or noite, same shape (the final response IS the digest — cron `--deliver` relays it):
 
     📰 *Fandom do dia* — 13/09
 
@@ -195,10 +195,11 @@ silence:
 ## Config
 
     fandom.py config get
-    fandom.py config set timezone=America/Sao_Paulo digest_time=08:30 language=pt-BR
+    fandom.py config set timezone=America/Sao_Paulo digest_times=08:00,12:00,18:00 language=pt-BR
 
 `teams list` and `config set` answer `onboarding_missing` — any key there
 means the first-contact conversation is unfinished; start it (after the
-first follow, never before). In your replies, call it the resumo da manhã
-(or morning roundup), never "digest" — that is the command's name, not a
-word for people.
+first follow, never before). In your replies, call it the resumo da manhã,
+da tarde or da noite (morning, afternoon or evening roundup) by the local
+hour it is actually firing at — never "digest", that is the command's name,
+not a word for people.

@@ -14,7 +14,7 @@ the change goes.
 | `plow-pbc/plow-hermes-agent` (base) | boot, `plow-init`, gateway config, base persona, plugin pin | anything Fandom-specific |
 | `persona.md` | Fandom's voice: language mirroring, first-value rule, honesty about scores | per-turn plumbing, tool how-tos |
 | `skills/fandom-watch/` | the engine: models, sources, news filter, matchday, store — and its SKILL.md | chat delivery (post_chat.py is its only exception, mechanically) |
-| `skills/fandom-news/` | the morning digest conversation and sports small-talk | news filtering (engine owns those) |
+| `skills/fandom-news/` | the digest conversation (manhã/tarde/noite) and sports small-talk | news filtering (engine owns those) |
 | `skills/fandom-onboarding/` | first contact, config questions, cron registration | the engine's defaults (config.py owns those) |
 | `skills/fandom-watch/scripts/kit/` | generic infrastructure: clock, http, jsonio — domain-free | anything that knows what a match is |
 | `fandom/engine/odds*.py` | de-vig, consensus, the odds file, the credit ledger, board name matching | fetching, and any human word about a price |
